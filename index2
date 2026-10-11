@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Outfit-Katalog</title>
+<style>
+/* Farben: Schwarzbraun, Dunkelblau, Weiß. Schrift: 2 Schnitte (400, 700). */
+:root{--k:#2a1c14;--b:#1b2d4b;--w:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--w);color:var(--k);font:16px/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--k);outline-offset:2px}
+b,dt,h1,.bar{font-weight:700}
+
+/* Menüleiste */
+header{display:flex;flex-wrap:wrap;align-items:stretch;border-bottom:2px solid var(--k);position:sticky;top:0;z-index:5;background:var(--w)}
+.brand{padding:10px 20px;border-right:2px solid var(--k);font-weight:700}
+.nav{border:0;border-right:2px solid var(--k);background:var(--w);padding:10px 20px;cursor:pointer}
+.nav:hover,.nav.on{background:var(--b);color:var(--w)}
+#wx{margin-left:auto;padding:10px 20px;font-size:14px}
+.lnk{border:0;background:none;padding:0;text-decoration:underline;cursor:pointer}
+
+/* Fenster */
+main{max-width:1100px;margin:0 auto;padding:28px 24px}
+.win{border:2px solid var(--k);box-shadow:4px 4px 0 var(--k);background:var(--w);margin-bottom:28px}
+.bar{margin:0;height:26px;line-height:22px;font-size:14px;text-align:center;border-bottom:2px solid var(--k);background:repeating-linear-gradient(var(--k) 0 1px,var(--w) 1px 4px)}
+.bar span{background:var(--w);padding:0 12px}
+.body{padding:20px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}
+.two>.win{margin-bottom:0}
+h1{font-size:20px;margin:0 0 16px}
+
+/* Bedienelemente */
+.btn{border:2px solid var(--k);background:var(--w);padding:8px 16px;font-weight:700;cursor:pointer}
+.btn:hover{background:var(--k);color:var(--w)}
+.pri{background:var(--b);border-color:var(--b);color:var(--w)}
+.pri:hover{background:var(--k);border-color:var(--k)}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+label{display:flex;flex-direction:column;gap:4px;font-size:14px}
+input,select,textarea{border:2px solid var(--k);border-radius:0;background:var(--w);padding:8px 10px}
+.chk{flex-direction:row;align-items:center;gap:8px}
+.filt{display:flex;flex-wrap:wrap;gap:16px;align-items:end}
+.form{display:flex;flex-direction:column;gap:14px}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.rb{width:36px;height:36px;margin-right:4px;border:2px solid var(--k);background:var(--w);font-size:20px;font-weight:700;cursor:pointer}
+.rb.on{background:var(--b);color:var(--w)}
+
+/* Raster und Bilder */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px}
+.tile{border:2px solid var(--k);background:var(--w);padding:6px;text-align:left;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 230px}
+.tile:hover{background:var(--b);color:var(--w)}
+.tile img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;border:1px solid var(--k);background:var(--w)}
+.tile b,.tile span{display:block;font-size:13px}
+.pic{display:block;width:100%;aspect-ratio:3/4;max-height:66vh;object-fit:contain;border:1px solid var(--k);background:var(--w)}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 20px;margin:0}dd{margin:0}
+.note{border:2px dashed var(--k);padding:12px 16px;margin-bottom:28px}
+.drop{border:2px dashed var(--k);padding:48px 20px;text-align:center}
+.drop.on{background:var(--b);color:var(--w)}
+.top{margin-bottom:20px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--b);color:var(--w);padding:10px 20px;border:2px solid var(--k);display:none;z-index:20}
+footer{text-align:center;font-size:13px;padding:0 0 28px}
+@media(max-width:820px){.two{grid-template-columns:1fr}.two>.win{margin-bottom:28px}main{padding:16px 12px}#wx{margin-left:0;width:100%;border-top:2px solid var(--k)}}
+</style></head><body>
+<header>
+<span class="brand">Outfit-Katalog</span>
+<button class="nav" data-act="nav" data-v="katalog">Katalog</button>
+<button class="nav" data-act="nav" data-v="neu">Neues Outfit</button>
+<button class="nav" data-act="nav" data-v="daten" id="tabD">Import / Export</button>
+<span id="wx"></span>
+</header>
+<main id="app"></main>
+<footer id="ft"></footer>
+<div id="toast" role="status"></div>
+<input type="file" id="file" accept="image/*" multiple hidden>
+<input type="file" id="rsf" accept=".json,application/json" hidden>
+<script>
+/* ============ Hilfen ============ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const DEF=['Büro','Freizeit','Fest','Sport'], F0={saison:'',anlass:'',min:0,q:'',offen:false}, DAY=864e5;
+const S={looks:[],view:'katalog',f:{...F0},lim:60,home:null,wx:null,detail:null,ed:null,q:[],qi:0,saved:[],full:{}};
+try{S.home=JSON.parse(localStorage.getItem('ort'))}catch{}
+let db,tt;
+
+/* ============ GitHub-Synchronisation ============
+   Vor der Nutzung GITHUB_REPO_URL ersetzen, z. B. https://github.com/USERNAME/REPOSITORY
+   Der Token wird nur im Arbeitsspeicher gehalten und beim Neuladen erneut abgefragt.
+   Erforderlich: Fine-grained Personal Access Token mit Contents: Read and write
+   für genau dieses Repository. Die Backup-Datei heißt outfits-backup.json.
+*/
+const GITHUB_REPO_URL='https://github.com/friesstamara-dev/Dressup-1';
+const GITHUB_BACKUP_PATH='outfits-backup.json';
+let gh={token:'',owner:'',repo:'',sha:null,ready:false,timer:null,busy:false,pending:false};
+function githubConfig(){
+  if(!GITHUB_REPO_URL.startsWith('https://github.com/'))return false;
+  const parts=GITHUB_REPO_URL.replace(/\/$/,'').split('/');
+  if(parts.length<5||!parts[3]||!parts[4])return false;
+  gh.owner=parts[3];gh.repo=parts[4].replace(/\.git$/,'');return true;
+}
+const ghApi=()=>`https://api.github.com/repos/${gh.owner}/${gh.repo}/contents/${GITHUB_BACKUP_PATH}`;
+function utf8ToBase64(s){const bytes=new TextEncoder().encode(s);let bin='';for(let i=0;i<bytes.length;i+=0x8000)bin+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(bin)}
+function base64ToUtf8(s){const bin=atob(s.replace(/\s/g,''));const bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));return new TextDecoder().decode(bytes)}
+async function ghRequest(url,options={}){
+  const r=await fetch(url,{...options,headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+gh.token,'X-GitHub-Api-Version':'2022-11-28',...(options.headers||{})}});
+  if(!r.ok){let detail='';try{detail=(await r.json()).message||''}catch{}throw new Error(`GitHub API (${r.status})${detail?': '+detail:''}`)}
+  return r.status===204?null:r.json();
+}
+async function ghRead(){
+  try{const d=await ghRequest(ghApi());gh.sha=d.sha;return JSON.parse(base64ToUtf8(d.content||''))}
+  catch(e){if(String(e.message).includes('(404)')){gh.sha=null;return null}throw e}
+}
+async function ghWrite(){
+  if(!gh.ready||!gh.token)return;
+  if(gh.busy){gh.pending=true;return}
+  gh.busy=true;
+  try{
+    const out=[];for(const l of S.looks){const{thumb,...m}=l;out.push({...m,foto:await getFoto(l.look_id)})}
+    const body={version:2,exportiert:new Date().toISOString(),looks:out};
+    const payload={message:'Outfit-Backup aktualisieren',content:utf8ToBase64(JSON.stringify(body)),...(gh.sha?{sha:gh.sha}:{})};
+    try{const saved=await ghRequest(ghApi(),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});gh.sha=saved.content?.sha||gh.sha;toast('Mit GitHub synchronisiert')}
+    catch(e){
+      /* Bei konkurrierenden Änderungen SHA neu laden und einmal erneut schreiben. */
+      if(String(e.message).includes('(409)')||String(e.message).includes('(422)')){
+        try{const latest=await ghRequest(ghApi());gh.sha=latest.sha;payload.sha=gh.sha;const saved=await ghRequest(ghApi(),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});gh.sha=saved.content?.sha||gh.sha;toast('Mit GitHub synchronisiert')}
+        catch(e2){throw e2}
+      }else throw e;
+    }
+  }catch(e){console.error(e);toast('GitHub-Synchronisierung fehlgeschlagen: '+e.message)}
+  finally{gh.busy=false;if(gh.pending){gh.pending=false;scheduleGhWrite()}}
+}
+function scheduleGhWrite(){if(!gh.ready)return;clearTimeout(gh.timer);gh.timer=setTimeout(ghWrite,1200)}
+async function initGitHubSync(){
+  if(!githubConfig()){console.info('GitHub-URL noch nicht konfiguriert; lokale Speicherung aktiv.');return}
+  const token=prompt('GitHub-Zugriffstoken eingeben (wird nicht dauerhaft gespeichert):');
+  if(!token){toast('GitHub nicht verbunden; lokale Speicherung aktiv.');return}
+  gh.token=token.trim();
+  try{
+    /* Token prüfen und neuestes Cloud-Backup laden. */
+    const remote=await ghRead();
+    if(remote&&!Array.isArray(remote.looks))throw new Error('Die Backup-Datei enthält kein gültiges Outfit-Array.');
+    if(remote){
+      for(const l of remote.looks){if(l.look_id&&l.foto&&l.aufgenommen_am)await ingest(l)}
+      sortL();
+    }
+    gh.ready=true;
+    if(!remote&&S.looks.length)await ghWrite();
+    else if(remote){toast('GitHub-Backup geladen');if(S.looks.length)scheduleGhWrite();}
+    else toast('GitHub verbunden; noch keine Backups vorhanden');
+  }catch(e){gh.token='';gh.ready=false;console.error(e);toast('GitHub-Verbindung fehlgeschlagen: '+e.message)}
+}
+
+
+const saison=i=>{const m=+i.slice(5,7);return m<3||m>11?'Winter':m<6?'Frühling':m<9?'Sommer':'Herbst'};
+const fmt=i=>new Date(i).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'});
+const stars=n=>'*'.repeat(n)+'-'.repeat(5-n);
+const iso=d=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+const ymd=i=>i.slice(2,4)+i.slice(5,7)+i.slice(8,10);
+const nid=d=>'ID'+String(Math.max(0,...S.looks.map(l=>+l.look_id.slice(2,6)||0))+1).padStart(4,'0')+'-'+ymd(d);
+const req=r=>new Promise((ok,no)=>{r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
+const opt=(arr,v)=>arr.map(([k,t])=>`<option value="${esc(k)}"${k==v?' selected':''}>${esc(t)}</option>`).join('');
+const anlaesse=()=>[...new Set([...DEF,...S.looks.map(l=>l.anlass).filter(Boolean)])];
+const lastBackup=()=>{try{return localStorage.getItem('bk')}catch{return null}};
+const backupDue=()=>S.looks.length>0&&(!lastBackup()||Date.now()-new Date(lastBackup())>14*DAY);
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',3500)}
+const win=(titel,inhalt)=>`<section class="win"><h2 class="bar"><span>${titel}</span></h2><div class="body">${inhalt}</div></section>`;
+
+/* ============ Speicher (IndexedDB): Daten + Vorschaubild getrennt vom großen Foto ============ */
+const open=()=>new Promise((ok,no)=>{const r=indexedDB.open('outfits',2);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('looks'))d.createObjectStore('looks',{keyPath:'look_id'});if(!d.objectStoreNames.contains('fotos'))d.createObjectStore('fotos',{keyPath:'id'})};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
+const sortL=()=>S.looks.sort((a,b)=>b.aufgenommen_am.localeCompare(a.aufgenommen_am));
+const getFoto=async id=>{const r=await req(db.transaction('fotos').objectStore('fotos').get(id));return r&&r.foto};
+const done=t=>new Promise((ok,no)=>{t.oncomplete=ok;t.onerror=()=>no(t.error)});
+async function putLook(m,foto){const t=db.transaction(['looks','fotos'],'readwrite');t.objectStore('looks').put(m);if(foto)t.objectStore('fotos').put({id:m.look_id,foto});await done(t);S.looks=S.looks.filter(x=>x.look_id!=m.look_id).concat(m);sortL();scheduleGhWrite()}
+async function delLook(id){const t=db.transaction(['looks','fotos'],'readwrite');t.objectStore('looks').delete(id);t.objectStore('fotos').delete(id);await done(t);S.looks=S.looks.filter(x=>x.look_id!=id);scheduleGhWrite()}
+const scale=(src,max,q)=>new Promise(ok=>{const im=new Image();im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',q))};im.onerror=()=>ok(null);im.src=src});
+async function ingest(l){const{foto,thumb,...m}=l;m.thumb=thumb||await scale(foto,320,.72);m.wetter=m.wetter||{temp:null,regen:null,wind:null};await putLook(m,foto)}
+async function init(){db=await open();S.looks=await req(db.transaction('looks').objectStore('looks').getAll());for(const l of S.looks.filter(x=>x.foto))await ingest(l);sortL()}
+
+/* ============ Wetter (Open-Meteo, ohne Anmeldung) ============ */
+const wetterText=c=>c==0?'klar':c<3?'heiter':c==3?'bewölkt':c<50?'Nebel':c<70?'Regen':c<80?'Schnee':c<85?'Schauer':'Gewitter';
+async function loadWx(){if(!S.home){S.wx=null;return}try{const{lat,lon}=S.home;S.wx=await(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=1&wind_speed_unit=ms`)).json()}catch{S.wx='err'}wxLine()}
+async function pastWx(i){if(!S.home)return null;const d=i.slice(0,10),{lat,lon}=S.home;for(const b of['https://archive-api.open-meteo.com/v1/archive','https://api.open-meteo.com/v1/forecast']){try{const x=(await(await fetch(`${b}?latitude=${lat}&longitude=${lon}&start_date=${d}&end_date=${d}&daily=temperature_2m_max,precipitation_sum,wind_speed_10m_max&timezone=auto&wind_speed_unit=ms`)).json()).daily;if(x&&x.temperature_2m_max&&x.temperature_2m_max[0]!=null)return{temp:Math.round(x.temperature_2m_max[0]),regen:x.precipitation_sum[0]>.1,wind:Math.round(x.wind_speed_10m_max[0]*10)/10}}catch{}}return null}
+function wxLine(){const e=$('#wx');if(!S.home){e.innerHTML='<button class="lnk" data-act="nav" data-v="daten">Wetter: Ort festlegen</button>';return}
+ if(!S.wx){e.textContent='Wetter wird geladen';return}if(S.wx=='err'){e.textContent='Wetter nicht erreichbar';return}
+ const c=S.wx.current,d=S.wx.daily;e.textContent=`${S.home.name}: ${Math.round(c.temperature_2m)} °C, ${wetterText(c.weather_code)}, Wind ${c.wind_speed_10m} m/s, ${Math.round(d.temperature_2m_min[0])}-${Math.round(d.temperature_2m_max[0])} °C, ${d.precipitation_sum[0]>.1?'Regen '+d.precipitation_sum[0]+' mm':'kein Regen'}`}
+const wetterKurz=w=>w&&(w.temp!=null||w.regen!=null||w.wind!=null)?[w.temp!=null?w.temp+' °C':null,w.regen==null?null:w.regen?'Regen':'kein Regen',w.wind!=null?w.wind+' m/s':null].filter(Boolean).join(', '):'-';
+
+/* ============ Bausteine ============ */
+const angaben=l=>`<dl><dt>Aufgenommen</dt><dd>${fmt(l.aufgenommen_am)}</dd><dt>Saison</dt><dd>${saison(l.aufgenommen_am)}</dd><dt>Anlass</dt><dd>${esc(l.anlass)||'-'}</dd><dt>Wetter</dt><dd>${wetterKurz(l.wetter)}</dd><dt>Bewertung</dt><dd>${l.bewertung?stars(l.bewertung):'-'}</dd><dt>Kommentar</dt><dd>${esc(l.kommentar)||'-'}</dd></dl>`;
+const tile=l=>`<button class="tile" data-act="open" data-id="${l.look_id}"><img loading="lazy" decoding="async" src="${l.thumb}" alt=""><b>${l.look_id}</b><span>${stars(l.bewertung||0)}${l.anlass?'':' (ohne Anlass)'}</span></button>`;
+function formular(e){const w=e.wetter||{};
+ return`<label>Aufgenommen am<input type="datetime-local" id="f_d" value="${e.aufgenommen_am}"></label>
+<label>Anlass<input id="f_a" list="al" value="${esc(e.anlass)}" placeholder="Auswählen oder eigenen Text eingeben"></label><datalist id="al">${anlaesse().map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
+<div class="row3"><label>Temperatur °C<input type="number" id="f_t" step="1" value="${w.temp??''}"></label><label>Regen<select id="f_r">${opt([['','unbekannt'],['0','kein Regen'],['1','Regen']],w.regen==null?'':w.regen?'1':'0')}</select></label><label>Wind m/s<input type="number" id="f_w" step="0.1" value="${w.wind??''}"></label></div>
+<div><button class="btn" data-act="pw">Wetter für diesen Tag laden</button></div>
+<div>Bewertung<br>${[1,2,3,4,5].map(i=>`<button class="rb${i<=e.bewertung?' on':''}" data-act="star" data-n="${i}" aria-label="${i} von 5">*</button>`).join('')}</div>
+<label>Kommentar<textarea id="f_k" rows="3">${esc(e.kommentar)}</textarea></label>`}
+function lesen(r){if(!r||!$('#f_d'))return;const n=id=>$(id).value===''?null:+$(id).value;r.aufgenommen_am=$('#f_d').value||r.aufgenommen_am;r.anlass=$('#f_a').value.trim();r.wetter={temp:n('#f_t'),regen:$('#f_r').value===''?null:$('#f_r').value=='1',wind:n('#f_w')};r.kommentar=$('#f_k').value}
+const aktuell=()=>S.view=='neu'?S.q[S.qi]:S.view=='outfit'?S.ed:null;
+function aehnlich(l){const w=l.wetter||{},s=saison(l.aufgenommen_am);
+ return S.looks.filter(x=>x.look_id!=l.look_id).map(x=>{const v=x.wetter||{};return{x,p:(x.anlass&&x.anlass==l.anlass?3:0)+(saison(x.aufgenommen_am)==s?2:0)+(l.bewertung&&x.bewertung&&Math.abs(x.bewertung-l.bewertung)<=1?1:0)+(v.temp!=null&&w.temp!=null&&Math.abs(v.temp-w.temp)<=5?1:0)+(v.regen!=null&&v.regen===w.regen?1:0)}}).filter(o=>o.p>0).sort((a,b)=>b.p-a.p).slice(0,6).map(o=>o.x)}
+function gefiltert(){const f=S.f,q=f.q.toLowerCase();return S.looks.filter(l=>(!f.saison||saison(l.aufgenommen_am)==f.saison)&&(!f.anlass||l.anlass==f.anlass)&&(!f.min||l.bewertung>=f.min)&&(!f.offen||!l.anlass)&&(!q||(l.kommentar+' '+l.anlass+' '+l.look_id).toLowerCase().includes(q)))}
+
+/* ============ Register ============ */
+function vKatalog(){const f=S.f;
+ return win('Filter',`<div class="filt"><label>Saison<select id="fs">${opt([['','Alle'],['Frühling','Frühling'],['Sommer','Sommer'],['Herbst','Herbst'],['Winter','Winter']],f.saison)}</select></label><label>Anlass<select id="fa">${opt([['','Alle'],...anlaesse().map(a=>[a,a])],f.anlass)}</select></label><label>Bewertung ab<select id="fm">${opt([[0,'Egal'],...[1,2,3,4,5].map(n=>[n,n+' von 5'])],f.min)}</select></label><label>Suche<input id="fq" value="${esc(f.q)}" placeholder="ID oder Kommentar"></label><label class="chk"><input type="checkbox" id="fo"${f.offen?' checked':''}> Nur ohne Anlass</label><button class="btn" data-act="reset">Zurücksetzen</button><button class="btn pri" data-act="random">Zufälliges Outfit</button></div>`)
+ +win('<span id="cnt">Katalog</span>','<div class="grid" id="grid"></div><p id="more"></p>')}
+function paint(){const a=gefiltert();$('#cnt').textContent='Katalog: '+a.length+(a.length==1?' Outfit':' Outfits');
+ $('#grid').innerHTML=a.slice(0,S.lim).map(tile).join('')||'<p>Keine Outfits für diese Filter. Setze die Filter zurück oder lege ein neues Outfit an.</p>';
+ $('#more').innerHTML=a.length>S.lim?`<button class="btn" data-act="more">Weitere anzeigen (${a.length-S.lim})</button>`:''}
+function vOutfit(){const l=S.looks.find(x=>x.look_id==S.detail);if(!l){S.view='katalog';return vKatalog()}
+ const e=S.ed,src=S.full.id==l.look_id?S.full.foto:l.thumb,sim=aehnlich(l);
+ const knoepfe=e?`<div class="btns"><button class="btn pri" data-act="save">Änderung speichern</button><button class="btn" data-act="disc">Änderung verwerfen</button></div>`
+  :`<div class="btns"><button class="btn pri" data-act="edit">Bearbeiten</button><button class="btn" data-act="del">Löschen</button></div>`;
+ return`<p class="top"><button class="btn" data-act="nav" data-v="katalog">&lt; Zurück zum Katalog</button></p>`
+ +`<div class="two" style="margin-bottom:28px">${win(l.look_id,`<img class="pic" id="bigpic" data-id="${l.look_id}" src="${src}" alt="Outfit ${l.look_id}">`)}${win('Angaben',e?`<div class="form">${formular(e)}</div>${knoepfe}`:angaben(l)+knoepfe)}</div>`
+ +win('Ähnliche Outfits',sim.length?`<div class="grid">${sim.map(tile).join('')}</div>`:'<p>Noch keine ähnlichen Outfits vorhanden.</p>')}
+function vNeu(){
+ if(!S.q.length)return win('Neues Outfit',`<div class="drop" id="drop"><p><b>Fotos hierher ziehen</b> oder auswählen</p><p>Du kannst mehrere Fotos auf einmal wählen. Danach trägst du die Angaben Foto für Foto ein.</p><button class="btn pri" data-act="add">Fotos auswählen</button></div>`);
+ const r=S.q[S.qi],n=S.q.length,rest=n-S.qi-1;
+ if(S.home&&r.wetter.temp==null&&!r.tried){r.tried=true;pastWx(r.aufgenommen_am).then(w=>{if(w&&aktuell()===r){lesen(r);r.wetter=w;render()}})}
+ return`<div class="two">${win(n>1?`Foto ${S.qi+1} von ${n}`:'Foto',`<img class="pic" src="${r.foto}" alt="Vorschau">`)}${win('Angaben',`<div class="form">${formular(r)}</div><div class="btns"><button class="btn pri" data-act="saveq">${rest?'Speichern und weiter':'Speichern'}</button><button class="btn" data-act="skipq">Foto überspringen</button>${rest?'<button class="btn" data-act="restq">Übrige ohne Angaben speichern</button>':''}<button class="btn" data-act="cancelq">Abbrechen</button></div>`)}</div>`}
+function vDaten(){const b=lastBackup();
+ return(backupDue()?'<p class="note"><b>Backup fällig.</b> Das letzte Backup ist älter als zwei Wochen oder fehlt.</p>':'')
+ +`<div class="two" style="margin-bottom:28px">${win('Backup speichern',`<p>Schreibt alle ${S.looks.length} Outfits samt Fotos in eine Datei. Lege sie an einem sicheren Ort ab.</p><p>Letztes Backup: ${b?fmt(b):'noch keins'}</p><button class="btn pri" data-act="bk">Backup speichern</button>`)}${win('Backup laden',`<p>Liest eine Backup-Datei ein. Outfits mit gleicher ID werden überschrieben, alle anderen bleiben erhalten.</p><button class="btn pri" data-act="rs">Backup laden</button>`)}</div>`
+ +win('Ort für das Wetter',`<label>Ort<input id="ort" value="${esc(S.home?.name)}" placeholder="Ort eingeben"></label><div class="btns"><button class="btn pri" data-act="ort">Ort speichern</button></div>`)
+ +'<p class="note">Fotos und Daten liegen lokal in der Browser-Datenbank. Wenn du die GitHub-URL im Code konfiguriert und einen Zugriffstoken eingegeben hast, wird zusätzlich die Datei outfits-backup.json im Repository synchronisiert. Ohne GitHub-Verbindung bleibt der lokale Betrieb verfügbar.</p>'}
+function render(){
+ $('#app').innerHTML={katalog:vKatalog,neu:vNeu,outfit:vOutfit,daten:vDaten}[S.view]();
+ const tab=S.view=='outfit'?'katalog':S.view;document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('on',b.dataset.v==tab));
+ $('#tabD').textContent='Import / Export'+(backupDue()?' (!)':'');
+ if(S.view=='katalog')paint();
+ const b=lastBackup();$('#ft').textContent=S.looks.length+' Outfits gespeichert, '+(b?'letztes Backup: '+fmt(b):'noch kein Backup');
+ const id=S.view=='outfit'?S.detail:null; /* großes Foto erst beim Öffnen nachladen */
+ if(id&&S.full.id!=id)getFoto(id).then(f=>{if(!f)return;S.full={id,foto:f};const im=$('#bigpic');if(im&&im.dataset.id==id)im.src=f})}
+function go(v){lesen(aktuell());S.view=v;render();scrollTo(0,0)}
+function openOutfit(id){lesen(aktuell());S.detail=id;S.ed=null;S.view='outfit';render();scrollTo(0,0)}
+
+/* ============ Aktionen ============ */
+async function storeQ(r){const{foto,tried,...m}=r;m.look_id=nid(m.aufgenommen_am);await putLook(m,foto);S.saved.push(m.look_id)}
+function nextQ(){S.qi++;if(S.qi>=S.q.length){const n=S.saved.length;S.q=[];S.qi=0;S.saved=[];S.view='katalog';S.f={...F0};toast(n?n+(n==1?' Outfit gespeichert':' Outfits gespeichert'):'Nichts gespeichert')}render();scrollTo(0,0)}
+async function addFiles(list){
+ const fs=[...list].filter(f=>f.type.startsWith('image/')),q=[];if(!fs.length){toast('Bitte JPEG- oder PNG-Bilder wählen.');return}
+ for(const [i,f] of fs.entries()){toast(`Foto ${i+1} von ${fs.length} wird vorbereitet`);const u=URL.createObjectURL(f),[foto,thumb]=await Promise.all([scale(u,1200,.8),scale(u,320,.72)]);URL.revokeObjectURL(u);if(foto)q.push({foto,thumb,aufgenommen_am:iso(new Date(f.lastModified||Date.now())),anlass:'',wetter:{temp:null,regen:null,wind:null},bewertung:0,kommentar:''})}
+ if(!q.length){toast('Die Bilder konnten nicht gelesen werden. Bitte als JPEG oder PNG speichern.');return}
+ S.q=q;S.qi=0;S.saved=[];go('neu')}
+async function backup(){toast('Backup wird erstellt');const out=[];for(const l of S.looks){const{thumb,...m}=l;out.push({...m,foto:await getFoto(l.look_id)})}
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({version:2,exportiert:new Date().toISOString(),looks:out})],{type:'application/json'}));
+ a.download='outfits-backup-'+ymd(iso(new Date()))+'.json';a.click();try{localStorage.setItem('bk',new Date().toISOString())}catch{}toast('Backup gespeichert');render()}
+const act={
+ nav:t=>go(t.dataset.v),
+ add:()=>$('#file').click(),
+ rs:()=>$('#rsf').click(),
+ bk:backup,
+ reset:()=>{S.f={...F0};S.lim=60;render()},
+ more:()=>{S.lim+=60;paint()},
+ random:()=>{const a=gefiltert();a.length?openOutfit(a[Math.floor(Math.random()*a.length)].look_id):toast('Keine Outfits für diese Filter.')},
+ open:t=>openOutfit(t.dataset.id),
+ edit:()=>{S.ed=JSON.parse(JSON.stringify(S.looks.find(x=>x.look_id==S.detail)));render()},
+ disc:()=>{S.ed=null;render()},
+ save:async()=>{lesen(S.ed);await putLook(S.ed,null);S.ed=null;toast('Gespeichert');render()},
+ del:async()=>{if(!confirm('Dieses Outfit endgültig löschen?'))return;await delLook(S.detail);S.detail=null;S.full={};toast('Gelöscht');go('katalog')},
+ star:t=>{const r=aktuell();lesen(r);const n=+t.dataset.n;r.bewertung=r.bewertung==n?0:n;render()},
+ pw:async()=>{if(!S.home){toast('Lege zuerst unter Import / Export einen Ort fest.');return}const r=aktuell();lesen(r);const w=await pastWx(r.aufgenommen_am);if(w){r.wetter=w;render()}else toast('Keine Wetterdaten gefunden. Bitte von Hand eintragen.')},
+ saveq:async()=>{const r=S.q[S.qi];lesen(r);await storeQ(r);nextQ()},
+ skipq:()=>nextQ(),
+ restq:async()=>{lesen(S.q[S.qi]);for(let i=S.qi;i<S.q.length;i++)await storeQ(S.q[i]);S.qi=S.q.length-1;nextQ()},
+ cancelq:()=>{S.q=[];S.saved=[];render()},
+ ort:async()=>{const n=$('#ort').value.trim();if(!n)return;try{const x=(await(await fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=de&name='+encodeURIComponent(n))).json()).results[0];S.home={name:x.name,lat:x.latitude,lon:x.longitude};try{localStorage.setItem('ort',JSON.stringify(S.home))}catch{}S.wx=null;wxLine();toast('Ort gespeichert');loadWx()}catch{toast('Ort nicht gefunden oder keine Verbindung.')}}
+};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(t&&act[t.dataset.act])act[t.dataset.act](t)});
+document.addEventListener('input',e=>{if(e.target.id=='fq'){S.f.q=e.target.value;S.lim=60;paint()}});
+document.addEventListener('change',e=>{const i=e.target.id,v=e.target.value;if(i=='fs')S.f.saison=v;else if(i=='fa')S.f.anlass=v;else if(i=='fm')S.f.min=+v;else if(i=='fo')S.f.offen=e.target.checked;else return;S.lim=60;paint()});
+document.addEventListener('dragover',e=>{if(e.target.closest('#drop')){e.preventDefault();$('#drop').classList.add('on')}});
+document.addEventListener('dragleave',()=>{const d=$('#drop');if(d)d.classList.remove('on')});
+document.addEventListener('drop',e=>{if(e.target.closest('#drop')){e.preventDefault();addFiles(e.dataTransfer.files)}});
+$('#file').onchange=e=>{const l=[...e.target.files];e.target.value='';addFiles(l)};
+$('#rsf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ try{const d=JSON.parse(await f.text());if(!Array.isArray(d.looks))throw 0;let n=0;
+  for(const l of d.looks)if(l.look_id&&l.foto&&l.aufgenommen_am){await ingest(l);if(++n%5==0)toast(n+' von '+d.looks.length+' eingelesen')}
+  render();toast(n+' Outfits eingelesen')}
+ catch{toast('Datei nicht lesbar. Bitte eine Backup-Datei dieses Tools wählen.')}};
+
+/* ============ Start: Katalog lädt automatisch ============ */
+(async()=>{
+ try{await init()}catch{toast('Browser-Speicher nicht verfügbar. Öffne die Datei in Chrome, Edge oder Firefox.')}
+ try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch{}
+ render();wxLine();loadWx()})();
+</script></body></html>
